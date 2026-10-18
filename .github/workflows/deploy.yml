@@ -1,0 +1,39 @@
+name: Deploy to Hostinger via SSH
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Sync to Hostinger
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout del Código
+        uses: actions/checkout@v4
+
+      - name: 🔑 Configurar Llave SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 65002 }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 🚀 Desplegar archivos con Rsync vía SSH
+        env:
+          SSH_PORT: ${{ secrets.SSH_PORT || 65002 }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_TARGET: ${{ secrets.REMOTE_TARGET }}
+        run: |
+          echo "Iniciando despliegue hacia $SSH_HOST:$REMOTE_TARGET en el puerto $SSH_PORT..."
+          rsync -avz --delete \
+            -e "ssh -p $SSH_PORT -o StrictHostKeyChecking=no" \
+            --exclude '.git*' \
+            --exclude '.github*' \
+            --exclude 'README.md' \
+            ./ $SSH_USER@$SSH_HOST:$REMOTE_TARGET
+          echo "✅ Despliegue completado con éxito hacia pbpnotion.linkear.net"
