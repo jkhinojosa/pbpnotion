@@ -24,9 +24,22 @@ jobs:
           mkdir -p ~/.ssh
           printf "%s\n" "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -l -f ~/.ssh/id_rsa || echo "⚠️ Error al leer la llave privada ~/.ssh/id_rsa"
           CLEAN_HOST=$(echo "$RAW_HOST" | tr -d '\r\n ')
           CLEAN_PORT=$(echo "${RAW_PORT:-65002}" | tr -d '\r\n ')
           ssh-keyscan -p "$CLEAN_PORT" -H "$CLEAN_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 🔍 Test de Conexión SSH
+        env:
+          RAW_PORT: ${{ secrets.SSH_PORT }}
+          RAW_USER: ${{ secrets.SSH_USER }}
+          RAW_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          CLEAN_HOST=$(echo "$RAW_HOST" | tr -d '\r\n ')
+          CLEAN_USER=$(echo "$RAW_USER" | tr -d '\r\n ')
+          CLEAN_PORT=$(echo "${RAW_PORT:-65002}" | tr -d '\r\n ')
+          echo "Probando conexión hacia $CLEAN_USER@$CLEAN_HOST:$CLEAN_PORT..."
+          ssh -v -p "$CLEAN_PORT" -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o BatchMode=yes "$CLEAN_USER@$CLEAN_HOST" "echo 'Autenticación SSH exitosa en Hostinger'"
 
       - name: 🚀 Desplegar archivos con Rsync vía SSH
         env:
