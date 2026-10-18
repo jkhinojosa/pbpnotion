@@ -16,24 +16,34 @@ jobs:
         uses: actions/checkout@v4
 
       - name: 🔑 Configurar Llave SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          RAW_HOST: ${{ secrets.SSH_HOST }}
+          RAW_PORT: ${{ secrets.SSH_PORT }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          printf "%s\n" "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p ${{ secrets.SSH_PORT || 65002 }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          CLEAN_HOST=$(echo "$RAW_HOST" | tr -d '\r\n ')
+          CLEAN_PORT=$(echo "${RAW_PORT:-65002}" | tr -d '\r\n ')
+          ssh-keyscan -p "$CLEAN_PORT" -H "$CLEAN_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: 🚀 Desplegar archivos con Rsync vía SSH
         env:
-          SSH_PORT: ${{ secrets.SSH_PORT || 65002 }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          REMOTE_TARGET: ${{ secrets.REMOTE_TARGET }}
+          RAW_PORT: ${{ secrets.SSH_PORT }}
+          RAW_USER: ${{ secrets.SSH_USER }}
+          RAW_HOST: ${{ secrets.SSH_HOST }}
+          RAW_TARGET: ${{ secrets.REMOTE_TARGET }}
         run: |
-          echo "Iniciando despliegue hacia $SSH_HOST:$REMOTE_TARGET en el puerto $SSH_PORT..."
+          CLEAN_HOST=$(echo "$RAW_HOST" | tr -d '\r\n ')
+          CLEAN_USER=$(echo "$RAW_USER" | tr -d '\r\n ')
+          CLEAN_PORT=$(echo "${RAW_PORT:-65002}" | tr -d '\r\n ')
+          CLEAN_TARGET=$(echo "$RAW_TARGET" | tr -d '\r\n ')
+          echo "Iniciando despliegue hacia $CLEAN_HOST:$CLEAN_TARGET en el puerto $CLEAN_PORT con usuario $CLEAN_USER..."
           rsync -avz --delete \
-            -e "ssh -p $SSH_PORT -o StrictHostKeyChecking=no" \
+            -e "ssh -p $CLEAN_PORT -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
             --exclude '.git*' \
             --exclude '.github*' \
             --exclude 'README.md' \
-            ./ $SSH_USER@$SSH_HOST:$REMOTE_TARGET
+            ./ "$CLEAN_USER@$CLEAN_HOST:$CLEAN_TARGET"
           echo "✅ Despliegue completado con éxito hacia pbpnotion.linkear.net"
